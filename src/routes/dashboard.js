@@ -28,6 +28,7 @@ const Dashboard = (props) => {
   const [dashBoardStats, setDashboardStats] = useState({
     orders: "_",
     revenue: "_",
+    revenueAfterDiscount: "_", // new property for revenue after discount
     items: "_",
     revenueBreak: { cash: 0, bank: 0 },
   });
@@ -57,15 +58,19 @@ const Dashboard = (props) => {
 
     let revenueBreak = ordersResponse.map((item) => {
       item.payment === "CASH"
-        ? (cashRev += item.total_amount)
-        : (bankRev += item.total_amount);
+        ? (cashRev +=  item.discountedTotal)
+        : (bankRev += item.discountedTotal);
     });
 
     let revenue = ordersResponse.reduce(
       (sum, item) => sum + +item.total_amount,
       0
     );
-
+    let revenueAfterDiscount = ordersResponse.reduce(
+      (sum, item) =>
+        sum + (item.discountedTotal ? +item.discountedTotal : +item.total_amount),
+      0
+    );
     let items = ordersResponse.reduce(
       (sum, item) => sum + JSON.parse(item.products).length,
       0
@@ -74,6 +79,7 @@ const Dashboard = (props) => {
     setDashboardStats({
       orders: ordersResponse.length,
       revenue: "₹" + revenue,
+      revenueAfterDiscount: "₹" + revenueAfterDiscount,
       items,
       revenueBreak: { cash: cashRev, bank: bankRev },
     });
@@ -125,9 +131,9 @@ const Dashboard = (props) => {
     getOrders();
   }, []);
 
-  const DetailsIcon = ({ data, name, icon, color, isRevenue }) => {
+  const DetailsIcon = ({ data, name, icon, color, isRevenue ,extraData}) => {
     return (
-      <Stack flexDirection="row" spacing="0" h="60px">
+      <Stack flexDirection="row" spacing="0" h="80px">
         <Box
           backgroundColor={color}
           boxSize="55px"
@@ -140,13 +146,19 @@ const Dashboard = (props) => {
         <Stack spacing="0" pl="10px">
           <Text color="#a6a6a6">{name}</Text>
           <Text fontWeight="bold" fontSize="22px">
-            {data}
+            {extraData ? extraData : data}
           </Text>
           {isRevenue && (
-            <Text fontSize="12px" fontWeight="medium" color="gray.500">
-              Cash:{dashBoardStats.revenueBreak.cash} , Bank :
-              {dashBoardStats.revenueBreak.bank}
-            </Text>
+            <>
+              {extraData && (
+                <Text fontSize="12px" fontWeight="medium" color="gray.500">
+                  Without Discount: {data}
+                </Text>
+              )}
+              <Text fontSize="12px" fontWeight="medium" color="gray.500">
+                Cash: {dashBoardStats.revenueBreak.cash} , Bank: {dashBoardStats.revenueBreak.bank}
+              </Text>
+            </>
           )}
         </Stack>
       </Stack>
@@ -239,6 +251,8 @@ const Dashboard = (props) => {
               name="Revenue"
               icon={<UilMoneyStack size="40px" color="#fff" />}
               isRevenue={true}
+              extraData={dashBoardStats.revenueAfterDiscount}
+
             />
 
             <DetailsIcon

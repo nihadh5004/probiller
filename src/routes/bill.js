@@ -32,10 +32,10 @@ import { useReactToPrint } from "react-to-print";
 import BillPrint from "../components/billPrint";
 import { useHotkeys } from "react-hotkeys-hook";
 
-// Note: `user` comes from the URL, courtesy of our router
 const Bill = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
+  const [discount, setDiscount] = useState(0); // New state for discount percentage
   const [isLoading, setIsLoading] = useState(false);
   const [billProducts, setBillProducts] = useState([]);
   const [selectedItem, setSelectedItem] = useState("");
@@ -56,9 +56,10 @@ const Bill = () => {
     };
     setBillProducts(productsCopy);
   };
+
   const searchProducts = async (searchTerm, callBack) => {
     const response = await sendAsync(`SELECT * FROM products
-    WHERE name LIKE '%${searchTerm}%'`);
+      WHERE name LIKE '%${searchTerm}%'`);
     const filteredResponse = response.map((product) => ({
       value: product,
       label: product.name,
@@ -86,13 +87,21 @@ const Bill = () => {
 
     setIsLoading(true);
 
+    // Calculate total and discounted total
+    const total = billProducts.reduce((prev, curr) => prev + curr.qty * curr.price, 0);
+    const discountedTotal = total * (1 - discount / 100);
+
+    // Save order with discount percentage and discounted total
     const resp = await sendAsync(
-      `INSERT INTO orders (date,products,total_amount,payment,name,mobile)VALUES(datetime('now', 'localtime'),'${JSON.stringify(
-        billProducts
-      )}','${billProducts.reduce(
-        (prev, curr) => prev + curr.qty * curr.price,
-        0
-      )}','${payment}','${customerName}','${customerMobile}')`
+      `INSERT INTO orders (date, products, total_amount, payment, name, mobile, discount, discountedTotal)
+      VALUES(datetime('now', 'localtime'),
+      '${JSON.stringify(billProducts)}',
+      '${total}',
+      '${payment}',
+      '${customerName}',
+      '${customerMobile}',
+      '${discount}',
+      '${discountedTotal}')`
     );
     console.log(resp);
 
@@ -104,6 +113,7 @@ const Bill = () => {
     setCustomerMobile("");
     setCustomerName("");
     setPayment("CASH");
+    setDiscount(0); // reset discount after order
     printReciept();
 
     setIsLoading(false);
@@ -117,7 +127,6 @@ const Bill = () => {
   return (
     <Stack backgroundColor="#eef2f9" ml="250px" h="100vh">
       {recieptOpen && <BillPrint data={{ ...toPrint }} />}
-
       <Modal
         isOpen={isOpen}
         onClose={onClose}
@@ -192,17 +201,14 @@ const Bill = () => {
             />
           </FormControl>
         </Stack>
-        <Box w="40%">
+       
+        <Box w="40%" mt="20px">
           <AsyncSelect
             ref={selectRef}
             loadOptions={searchProducts}
             onChange={(input) => {
               setSelectedItem({ ...input.value, qty: "" });
               onOpen();
-
-              // setBillProducts((old) => [...old, { ...input.value, qty: 1 }]);
-
-              // selectRef.current.focus();
             }}
           />
         </Box>
@@ -263,7 +269,7 @@ const Bill = () => {
         </Table>
         <Stack alignSelf="flex-end" pr="20px" pt="60px">
           <Stack direction="row" mb="20px">
-            <Text fontWeight="bold">Grant Total: </Text>
+            <Text fontWeight="bold">Grand Total: </Text>
             <Text fontWeight="bold" pl="20px">
               ₹
               {billProducts.length > 0 &&
@@ -273,6 +279,30 @@ const Bill = () => {
                 )}
             </Text>
           </Stack>
+          <FormControl width="100%" mb="20px">
+            <FormLabel>Discount (%)</FormLabel>
+            <Input
+              type="number"
+              value={discount}
+              onChange={(e) => setDiscount(Number(e.target.value))}
+              placeholder="Enter discount percentage"
+            />
+          </FormControl>
+          {billProducts.length > 0 && (
+            <Stack direction="row" mb="20px">
+              <Text fontWeight="bold">Discounted Total: </Text>
+              <Text fontWeight="bold" pl="20px">
+                ₹
+                {billProducts.length > 0 &&
+                  (
+                    billProducts.reduce(
+                      (prev, curr) => prev + curr.qty * curr.price,
+                      0
+                    ) * (1 - discount / 100)
+                  ).toFixed(2)}
+              </Text>
+            </Stack>
+          )}
 
           <FormControl pb="20px">
             <FormLabel>Payment</FormLabel>

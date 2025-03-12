@@ -75,6 +75,12 @@ const BillPrint = ({ data }) => (
       <Text fontWeight="bold">Grant Total</Text>
       <Text fontWeight="bold">₹{data.total_amount}</Text>
     </Stack>
+    {data.discount > 0 && (
+      <Stack direction="row" pt="15px" justifyContent="space-between" w="100%">
+        <Text fontWeight="bold">Discounted Total</Text>
+        <Text fontWeight="bold">₹{data.discountedTotal}</Text>
+      </Stack>
+    )}
 
     <Box h="85px">&nbsp;</Box>
     <Box position="absolute" bottom="8px">

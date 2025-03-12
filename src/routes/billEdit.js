@@ -32,12 +32,12 @@ import { useReactToPrint } from "react-to-print";
 import BillPrint from "../components/billPrint";
 import { useHotkeys } from "react-hotkeys-hook";
 
-// Note: `user` comes from the URL, courtesy of our router
 const BillEdit = (props) => {
   const orderId = props.match.params.id;
 
   const [customerName, setCustomerName] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
+  const [discount, setDiscount] = useState(0); // New discount state
   const [isLoading, setIsLoading] = useState(false);
   const [billProducts, setBillProducts] = useState([]);
   const [selectedItem, setSelectedItem] = useState("");
@@ -51,14 +51,14 @@ const BillEdit = (props) => {
   useEffect(() => {
     const getOrder = async () => {
       console.log(orderId);
-      let orderEdit = await sendAsync(
-        `SELECT * FROM orders WHERE  id=${orderId}`
-      );
+      let orderEdit = await sendAsync(`SELECT * FROM orders WHERE id=${orderId}`);
       orderEdit = orderEdit[0];
       setCustomerName(orderEdit.name);
       setCustomerMobile(orderEdit.mobile);
       setBillProducts(JSON.parse(orderEdit.products));
       setPayment(orderEdit.payment);
+      // Set discount if available; default to 0 otherwise
+      setDiscount(orderEdit.discount || 0);
     };
     getOrder();
   }, [orderId]);
@@ -71,6 +71,7 @@ const BillEdit = (props) => {
     };
     setBillProducts(productsCopy);
   };
+
   const searchProducts = async (searchTerm, callBack) => {
     const response = await sendAsync(`SELECT * FROM products
     WHERE name LIKE '%${searchTerm}%'`);
@@ -87,13 +88,17 @@ const BillEdit = (props) => {
 
     setIsLoading(true);
 
+    // Calculate total and discounted total
+    const total = billProducts.reduce(
+      (prev, curr) => prev + curr.qty * curr.price,
+      0
+    );
+    const discountedTotal = total * (1 - discount / 100);
+
     const resp = await sendAsync(
       `UPDATE orders SET products='${JSON.stringify(
         billProducts
-      )}',total_amount='${billProducts.reduce(
-        (prev, curr) => prev + curr.qty * curr.price,
-        0
-      )}',payment='${payment}',name='${customerName}',mobile='${customerMobile}' WHERE id=${orderId}`
+      )}', total_amount='${total}', payment='${payment}', name='${customerName}', mobile='${customerMobile}', discount='${discount}', discountedTotal='${discountedTotal}' WHERE id=${orderId}`
     );
     setIsLoading(false);
     history.push("/orders");
@@ -182,10 +187,6 @@ const BillEdit = (props) => {
             onChange={(input) => {
               setSelectedItem({ ...input.value, qty: "" });
               onOpen();
-
-              // setBillProducts((old) => [...old, { ...input.value, qty: 1 }]);
-
-              // selectRef.current.focus();
             }}
           />
         </Box>
@@ -246,7 +247,7 @@ const BillEdit = (props) => {
         </Table>
         <Stack alignSelf="flex-end" pr="20px" pt="60px">
           <Stack direction="row" mb="20px">
-            <Text fontWeight="bold">Grant Total: </Text>
+            <Text fontWeight="bold">Grand Total: </Text>
             <Text fontWeight="bold" pl="20px">
               ₹
               {billProducts.length > 0 &&
@@ -256,7 +257,30 @@ const BillEdit = (props) => {
                 )}
             </Text>
           </Stack>
-
+          {/* Discount input placed after Grand Total */}
+          <FormControl width="100%" mb="20px">
+            <FormLabel>Discount (%)</FormLabel>
+            <Input
+              type="number"
+              value={discount}
+              onChange={(e) => setDiscount(Number(e.target.value))}
+              placeholder="Enter discount percentage"
+            />
+          </FormControl>
+          {discount > 0 && (
+            <Stack direction="row" mb="20px">
+              <Text fontWeight="bold">Discounted Total: </Text>
+              <Text fontWeight="bold" pl="20px">
+                ₹
+                {(
+                  billProducts.reduce(
+                    (prev, curr) => prev + curr.qty * curr.price,
+                    0
+                  ) * (1 - discount / 100)
+                ).toFixed(2)}
+              </Text>
+            </Stack>
+          )}
           <FormControl pb="20px">
             <FormLabel>Payment</FormLabel>
             <RadioGroup onChange={setPayment} value={payment}>
